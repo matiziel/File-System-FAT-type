@@ -13,8 +13,9 @@ make all
 echo "======================"
 echo "===TWORZENIE PLIKOW==="
 echo "======================"
+touch virtualdisk
 dd if=/dev/urandom of=$name bs=4096 count=256
-dd if=/dev/urandom of=$name2 bs=4096 count=128
+dd if=/dev/urandom of=$name2 bs=2048 count=123 #dlugosc pliku nie podzielna przez rozmiar bloku 
 echo "==========================="
 echo "TWORZENIE WIRTUALNEGO DYSKU"
 echo "==========================="
@@ -34,7 +35,7 @@ echo "==========================="
 echo "==========================="
 echo "========USUWANIE==========="
 echo "==========================="
-
+echo "Usuwanie pliku $name"
 ./lab6 6 $name
 ./lab6 4
 echo "==========================="
@@ -45,3 +46,8 @@ md5sum $name1 $name
 md5sum $name2 $name3
 
 ./lab6 7
+
+for i in $name1 $name $name2 $name3
+do
+    rm $i
+done

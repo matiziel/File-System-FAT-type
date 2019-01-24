@@ -133,6 +133,8 @@ int FileSystem::importFile(char *name)
 {
     FILE *virtualDisk, *newFile;
     int i, firstBlockNumber, numberInDentry;
+    int half = 0;
+    bool zHalf = false;
     for (i = 0; i < MAX_FILE_COUNT; ++i)
     {
         if (!strcmp(fileDescriptors[i].name, name))
@@ -168,7 +170,12 @@ int FileSystem::importFile(char *name)
     if (fileSize % BLOCK_SIZE == 0)
         howMuchBlocks = fileSize / BLOCK_SIZE;
     else
+    {
         howMuchBlocks = fileSize / BLOCK_SIZE + 1;
+        zHalf = true;
+        half = fileSize - (howMuchBlocks - 1) * BLOCK_SIZE;
+    }
+    std::cout << "rozmiar ostatniego bloku " << half << std::endl;
 
     if (howMuchBlocks > superBlock->userSpace)
     {
@@ -223,23 +230,56 @@ int FileSystem::importFile(char *name)
             fclose(virtualDisk);
             return -2;
         }
+
         fseek(virtualDisk, superBlock->blocksOffset + firstBlockNumber * sizeof(Block), 0);
-        if (fread(tmpBlock->block, BLOCK_SIZE, 1, newFile) != 1 && !feof(newFile))
+        if ((i == howMuchBlocks - 1) && zHalf == true)
         {
-            printf("Error. Failed to read data from file\n");
-            fclose(newFile);
-            fclose(virtualDisk);
-            delete tmpBlock;
-            return -2;
+            if (fread(tmpBlock->block, half, 1, newFile) != 1 && !feof(newFile))
+            {
+                printf("Error. Failed to read data from file\n");
+                fclose(newFile);
+                fclose(virtualDisk);
+                delete tmpBlock;
+                return -2;
+            }
         }
-        if (fwrite(tmpBlock->block, sizeof(Block), 1, virtualDisk) != 1)
+        else
         {
-            printf("Error. Failed to write data from file\n");
-            fclose(newFile);
-            fclose(virtualDisk);
-            delete tmpBlock;
-            return -2;
+            if (fread(tmpBlock->block, BLOCK_SIZE, 1, newFile) != 1 && !feof(newFile))
+            {
+                printf("Error. Failed to read data from file\n");
+                fclose(newFile);
+                fclose(virtualDisk);
+                delete tmpBlock;
+                return -2;
+            }
         }
+
+        if ((i == howMuchBlocks - 1) && zHalf == true)
+        {
+            if (fwrite(tmpBlock->block, half, 1, virtualDisk) != 1)
+            {
+                printf("Error. Failed to read data from file\n");
+                fclose(newFile);
+                fclose(virtualDisk);
+                delete tmpBlock;
+                return -2;
+            }
+        }
+        else
+            int half = 0;
+        bool zHalf = false;
+        {
+            if (fwrite(tmpBlock->block, sizeof(Block), 1, virtualDisk) != 1)
+            {
+                printf("Error. Failed to write data from file\n");
+                fclose(newFile);
+                fclose(virtualDisk);
+                delete tmpBlock;
+                return -2;
+            }
+        }
+
         if (i != 0)
             FAT[tmp] = firstBlockNumber;
         superBlock->userSpace--;
@@ -260,20 +300,20 @@ int FileSystem::importFile(char *name)
 //**************************************************************************
 //**************************************************************************
 
-int FileSystem::exportFile(char *name, char* exportName)
+int FileSystem::exportFile(char *name, char *exportName)
 {
     FILE *virtualDisk, *newFile;
     int numberInDentry = -1;
     int i;
     int howMuchBlocks;
+    int half = 0;
+    bool zHalf = false;
     for (i = 0; i < MAX_FILE_COUNT; ++i)
     {
         if (!strcmp(fileDescriptors[i].name, name))
         {
-            std::cout<<"Wchodzi"<<std::endl;
             if (fileDescriptors[i].valid == true)
             {
-                std::cout<<"Wchodzi222"<<std::endl;
                 numberInDentry = i;
                 break;
             }
@@ -288,8 +328,11 @@ int FileSystem::exportFile(char *name, char* exportName)
     if (fileDescriptors[numberInDentry].size % BLOCK_SIZE == 0)
         howMuchBlocks = fileDescriptors[numberInDentry].size / BLOCK_SIZE;
     else
+    {
         howMuchBlocks = fileDescriptors[numberInDentry].size / BLOCK_SIZE + 1;
-
+        zHalf = true;
+        half = fileDescriptors[numberInDentry].size - (howMuchBlocks - 1) * BLOCK_SIZE;
+    }
     virtualDisk = fopen("virtualdisk", "r+b");
     if (virtualDisk == nullptr)
     {
@@ -315,16 +358,31 @@ int FileSystem::exportFile(char *name, char* exportName)
     for (i = 0; i < howMuchBlocks; ++i)
     {
         fseek(virtualDisk, superBlock->blocksOffset + tmp * sizeof(Block), 0);
-        fread(tmpBlock->block, sizeof(Block), 1, virtualDisk);
+        if ((i == howMuchBlocks - 1 && zHalf == true))
+            fread(tmpBlock->block, half, 1, virtualDisk);
+        else
+            fread(tmpBlock->block, sizeof(Block), 1, virtualDisk);
         if (tmp != -1)
             tmp = FAT[tmp];
-
-        if (fwrite(tmpBlock->block, sizeof(Block), 1, newFile) != 1)
+        if ((i == howMuchBlocks - 1 && zHalf == true))
         {
-            std::cout << "Blad exportu do pliku!\n";
-            fclose(virtualDisk);
-            fclose(newFile);
-            return -1;
+            if (fwrite(tmpBlock->block, half, 1, newFile) != 1)
+            {
+                std::cout << "Blad exportu do pliku!\n";
+                fclose(virtualDisk);
+                fclose(newFile);
+                return -1;
+            }
+        }
+        else
+        {
+            if (fwrite(tmpBlock->block, sizeof(Block), 1, newFile) != 1)
+            {
+                std::cout << "Blad exportu do pliku!\n";
+                fclose(virtualDisk);
+                fclose(newFile);
+                return -1;
+            }
         }
     }
     delete tmpBlock;
@@ -408,7 +466,7 @@ int FileSystem::deleteFile(char *name)
         return -1;
     }
     int fileSize = fileDescriptors[numberInDentry].size;
-    std::cout<<"Rozmiar "<<fileSize<<std::endl;
+    std::cout << "Rozmiar " << fileSize << std::endl;
     if (fileSize % BLOCK_SIZE == 0)
         howMuchBlocks = fileSize / BLOCK_SIZE;
     else
@@ -435,7 +493,7 @@ int FileSystem::deleteFile(char *name)
     fileDescriptors[numberInDentry].valid = false;
     int tmp = firstBlock;
     int xtmp;
-    std::cout<<"Ilosc blokow"<<howMuchBlocks<<std::endl;
+    std::cout << "Ilosc blokow" << howMuchBlocks << std::endl;
     for (int j = 0; j < howMuchBlocks; ++j)
     {
         fseek(virtualDisk, superBlock->blocksOffset + tmp * sizeof(Block), 0);
@@ -448,7 +506,7 @@ int FileSystem::deleteFile(char *name)
         else
         {
             FAT[tmp] = -2;
-            break; 
+            break;
         }
         superBlock->userSpace++;
         superBlock->userSpaceInUse--;
