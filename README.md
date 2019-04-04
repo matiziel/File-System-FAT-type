@@ -6,5 +6,6 @@ Założenia:
 - podstawowe operacje (dodanie pliku, usunięcie pliku, edycja)
 - pliki mają atrybut datę utworzenia i datę modyfikacji.
 - interfejs zbliżony do GITa tnz <program> <komenda> args
+  
 Uruchomienie ./skrypt_testowy.sh
 Testowany na Ubuntu 18.04 LTS 
